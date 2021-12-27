@@ -13,6 +13,26 @@ MAINS_FREQUENCY = 60.0
 FREQUENCY_BANDWITH = 1.0
 MIN_FREQ = MAINS_FREQUENCY - FREQUENCY_BANDWITH/2
 MAX_FREQ = MAINS_FREQUENCY + FREQUENCY_BANDWITH/2
+AUDIO_FILE = 'audio.wav'
+
+def importAudioSignal(file):
+    samplesPerSecond, data = wavfile.read(file)
+    #time in seconds at each sample
+    time = [1.0*x/samplesPerSecond for x in range(len(data))]
+    samplePeriod = 1.0/samplesPerSecond
+
+    print('Data length: ', data.size)
+    print('Samples per second: ', samplesPerSecond ,' sample period: ',samplePeriod)
+    print('Clip length: ', data.size/samplesPerSecond)
+    return samplesPerSecond, time, samplePeriod, data
+
+def filterNonENFSignal(signal, samplesPerSecond):
+    '''
+    Remove noise
+    '''
+    sos = butter(N=10, Wn =[MIN_FREQ, MAX_FREQ], btype = 'bandpass', output = 'sos', fs=samplesPerSecond)
+    filteredSignal = sosfilt(sos, signal)
+    return filteredSignal
 
 def plotFrequencyDomain(data, samplesPerSecond):
     freqDomain = rfft(data)
@@ -67,23 +87,10 @@ def findInterpolatedPeak(FFTFreqs, FFTBins):
     '''
     return res.x[0]
 
+def extractENF(file):
+    samplesPerSecond, time, samplePeriod, signal = importAudioSignal(file)
 
-if __name__ == "__main__":
-    samplesPerSecond, data = wavfile.read('audio.wav')
-    data
-    #time in seconds at each sample
-    time = [1.0*x/samplesPerSecond for x in range(len(data))]
-    samplePeriod = 1.0/samplesPerSecond
-
-    print('Data length: ', data.size)
-    print('Samples per second: ', samplesPerSecond ,' sample period: ',samplePeriod)
-    print('Clip length: ', data.size/samplesPerSecond)
-
-    '''
-    Remove noise
-    '''
-    sos = butter(N=10, Wn =[MIN_FREQ, MAX_FREQ], btype = 'bandpass', output = 'sos', fs=samplesPerSecond)
-    filteredSignal = sosfilt(sos, data)
+    filteredSignal = filterNonENFSignal(signal, samplesPerSecond)
 
     f,t,Zxx = getSpectrogram(filteredSignal,samplesPerSecond)
 
@@ -99,14 +106,18 @@ if __name__ == "__main__":
         peakFreq = findInterpolatedPeak(f, FFTBins)
         peakFrequencies.append(peakFreq)
 
-    print(peakFrequencies)
-    plt.plot(t[2:-2], peakFrequencies[2:-2], 'o')
+    return t, peakFrequencies
+
+
+if __name__ == "__main__":
+
+    times, ENFFrequencies =  extractENF(AUDIO_FILE)
+    '''
+    clearly there are some issues when the extraction window overlaps the end of the file
+    probably best to throw away the first and last n (2 in this case) datapoints
+    '''
+    plt.plot(times, ENFFrequencies, 'o')
     plt.show()
-
-
-
-
-
 
 
 
